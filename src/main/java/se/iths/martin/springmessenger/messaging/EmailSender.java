@@ -1,22 +1,22 @@
 package se.iths.martin.springmessenger.messaging;
 
-import jakarta.mail.Authenticator;
-import jakarta.mail.PasswordAuthentication;
-import jakarta.mail.Session;
-import jakarta.mail.Transport;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 import se.iths.martin.springmessenger.model.Email;
 import se.iths.martin.springmessenger.model.Message;
 
-import java.util.Properties;
-
 @Component("email")
 public class EmailSender implements Messenger {
-    private static final String FROM = "martin.gruter@gmail.com";
-    private static final String APP_PASSWORD = "";
+    private final JavaMailSender mailSender;
+    private final String from;
 
+    public EmailSender(JavaMailSender mailSender, @Value("${spring.mail.username}") String from) {
+        this.mailSender = mailSender;
+        this.from = from;
+    }
 
     @Override
     public void send(Message message) {
@@ -24,28 +24,16 @@ public class EmailSender implements Messenger {
             throw new IllegalArgumentException("Fel typ av meddelande");
         }
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.port", "587");
-        Session session = Session.getInstance(props, new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(FROM, APP_PASSWORD);
-            }
-        });
+        SimpleMailMessage mail = new SimpleMailMessage();
+        mail.setFrom(from);
+        mail.setTo(email.getRecipient());
+        mail.setSubject(email.getSubject());
+        mail.setText(email.getMessage());
 
         try {
-            MimeMessage mimeMessage = new MimeMessage(session);
-            mimeMessage.setFrom(new InternetAddress(FROM));
-            mimeMessage.setRecipient(jakarta.mail.Message.RecipientType.TO,
-                    new InternetAddress(email.getRecipient()));
-            mimeMessage.setSubject(email.getSubject());
-            mimeMessage.setText(email.getMessage());
-            Transport.send(mimeMessage);
+            mailSender.send(mail);
             System.out.println("Mail sent");
-        } catch (Exception e) {
+        } catch (MailException e) {
             System.out.println("Error sending message: " + e.getMessage());
         }
     }
